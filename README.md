@@ -12,10 +12,10 @@ Grok Oracle turns that advantage into something other agents can actually use.
 
 ## Core Deliverables
 
-- **`grok-oracle` skill** — installed to `~/.grok/skills/grok-oracle/`. Run with `/grok-oracle <query>`.
-- **Bridge scripts** (`bridge/`) — small CLI helpers other agents can shell out to.
-- **Integration packs** (`integrations/`) — ready-to-paste instructions for Claude, Cursor, Aider, etc.
-- **Protocol** — simple, reliable way for another agent to request help and get high-signal structured answers back.
+- **`grok-oracle` skill**: installed to `~/.grok/skills/grok-oracle/`. Run with `/grok-oracle <query>`.
+- **Bridge script** ([`bridge/grok-oracle.ps1`](bridge/grok-oracle.ps1)): a small PowerShell helper other agents can shell out to.
+- **Integration packs** ([`integrations/`](integrations/)): ready-to-paste instructions for Claude, Cursor and Aider, plus a general protocol for any other agent.
+- **Protocol**: a simple, reliable way for another agent to request help and get high-signal structured answers back.
 
 ## Killer Use Cases
 
@@ -36,17 +36,15 @@ Grok Oracle turns that advantage into something other agents can actually use.
    /grok-oracle What are people on X saying about Grok 4 coding performance in the last 10 days?
    ```
 
-## Installation (Done)
+## Installation
 
-The skill is already installed to:
+The installer ([`scripts/install-skill.ps1`](scripts/install-skill.ps1)) copies the source skill at [`skill/grok-oracle/SKILL.md`](skill/grok-oracle/SKILL.md) to:
 
-`C:\Users\sarut\.grok\skills\grok-oracle\SKILL.md`
+`%USERPROFILE%\.grok\skills\grok-oracle\SKILL.md`
 
-(Installed via `scripts\install-skill.ps1` from this folder.)
+It resolves the source path relative to the script itself, so it works from any directory. The TUI should pick it up on next load or file change. Verify anytime with `grok inspect`.
 
-The TUI should pick it up on next load or file change. Verify anytime with `grok inspect`.
-
-You can also re-run the installer from this folder if you edit the source skill:
+Re-run the installer from the repo root whenever you edit the source skill:
 
 ```powershell
 .\scripts\install-skill.ps1
@@ -54,11 +52,17 @@ You can also re-run the installer from this folder if you edit the source skill:
 
 ## Project Structure
 
-- `skill/grok-oracle/SKILL.md` — the actual Grok skill definition
-- `bridge/` — invocation helpers / CLI for other agents
-- `integrations/` — system prompt additions and command examples for popular agents
-- `docs/` — Project Brief, Strategic Spec, etc.
-- `examples/` — sample queries and expected outputs
+- [`skill/grok-oracle/SKILL.md`](skill/grok-oracle/SKILL.md): the Grok-side skill definition (source of truth)
+- [`scripts/install-skill.ps1`](scripts/install-skill.ps1): installs the Grok skill to `~/.grok/skills/grok-oracle/`
+- [`bridge/`](bridge/): the PowerShell bridge other agents shell out to, plus its [README](bridge/README.md)
+- [`integrations/`](integrations/): custom instructions for [Claude](integrations/claude.md), [Cursor](integrations/cursor.md), [Aider](integrations/aider.md) and a [general protocol](integrations/general-protocol.md)
+- [`claude-commands/`](claude-commands/): the Claude `/grok-oracle` command and install notes
+- [`claude-skills/grok-oracle/SKILL.md`](claude-skills/grok-oracle/SKILL.md): the Claude-side liaison skill
+- [`codex/grok-oracle-instructions.md`](codex/grok-oracle-instructions.md): instructions for Codex and OpenAI agents
+- [`docs/PROJECT_BRIEF.md`](docs/PROJECT_BRIEF.md): the Project Brief
+- [`Grok Oracle - Strategic Build Spec.md`](<Grok Oracle - Strategic Build Spec.md>): the Strategic Build Spec (at the repo root, not in `docs/`)
+- [`examples/`](examples/): [sample queries](examples/sample-queries.md) and a [live MCP signal demo](examples/live-mcp-signal-demo.md)
+- [`AGENTS.md`](AGENTS.md) and [`TODO.md`](TODO.md): the agent contract and the task list
 
 ## Status
 
@@ -69,11 +73,11 @@ You can also re-run the installer from this folder if you edit the source skill:
 - Integration guides for Claude, Cursor, Aider + general protocol.
 - Example queries and full project docs in the user's preferred experiment style.
 
-**Live test (right now in this session):** The X searches above were exactly the kind of query this is built for (MCP servers + agent tool exposure). The skill would have turned those results into a tight, citable summary + Grok Build take + escalation offers.
+**Live test:** [`examples/live-mcp-signal-demo.md`](examples/live-mcp-signal-demo.md) shows the kind of query this is built for (MCP servers and agent tool exposure) and the structured answer the skill is designed to produce.
 
 This is **Grok Build Experiment 1** — deliberately meta. We used the Grok Build environment (and its privileged X tools + skill system) to build something that makes those same strengths available to the rest of your agent stack.
 
-See `docs/` (Strategic Build Spec + Project Brief) and `examples/sample-queries.md` for more.
+See the [Strategic Build Spec](<Grok Oracle - Strategic Build Spec.md>), the [Project Brief](docs/PROJECT_BRIEF.md) and [`examples/sample-queries.md`](examples/sample-queries.md) for more.
 
 ## How to Use It Today
 
@@ -87,10 +91,10 @@ See `docs/` (Strategic Build Spec + Project Brief) and `examples/sample-queries.
 - Then in Claude you (or Claude) can type `/grok-oracle <question>`.
 - It will either shell the bridge or output the clean marker for you to forward.
 
-See `claude-commands/README.md` and `claude-skills/` for easy install options. We also ship a `claude-skills/grok-oracle/SKILL.md` for the skills folder.
+See [`claude-commands/README.md`](claude-commands/README.md) and [`claude-skills/`](claude-skills/) for easy install options. We also ship a `claude-skills/grok-oracle/SKILL.md` for the skills folder.
 
 **From Codex / OpenAI agents:**
-- Use the instructions in `codex/grok-oracle-instructions.md`.
+- Use the instructions in [`codex/grok-oracle-instructions.md`](codex/grok-oracle-instructions.md).
 - Same bridge or marker mechanism.
 
 **From Cursor / Aider:**
