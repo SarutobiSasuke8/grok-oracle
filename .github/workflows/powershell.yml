@@ -1,0 +1,56 @@
+name: powershell
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PESTER_VERSION: '5.7.1'
+  PSSA_VERSION: '1.23.0'
+
+jobs:
+  test:
+    name: Pester + PSScriptAnalyzer (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Pester and PSScriptAnalyzer from PSGallery
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -RequiredVersion $env:PESTER_VERSION -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module -Name PSScriptAnalyzer -RequiredVersion $env:PSSA_VERSION -Scope CurrentUser -Force
+          Get-Module -ListAvailable Pester, PSScriptAnalyzer | Select-Object Name, Version | Format-Table -AutoSize
+
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Import-Module PSScriptAnalyzer -RequiredVersion $env:PSSA_VERSION
+          $findings = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1
+          $findings | Format-Table Severity, RuleName, ScriptName, Line, Message -AutoSize | Out-String -Width 200 | Write-Host
+          foreach ($f in $findings) {
+            Write-Host "::error file=$($f.ScriptPath),line=$($f.Line)::$($f.RuleName): $($f.Message)"
+          }
+          Write-Host "PSScriptAnalyzer findings: $(@($findings).Count)"
+          if (@($findings).Count -gt 0) { exit 1 }
+
+      - name: Pester (no network, no credentials)
+        shell: pwsh
+        run: |
+          Import-Module Pester -RequiredVersion $env:PESTER_VERSION
+          $config = New-PesterConfiguration
+          $config.Run.Path = './tests'
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputPath = 'testResults.xml'
+          Invoke-Pester -Configuration $config
