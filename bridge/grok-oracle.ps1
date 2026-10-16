@@ -34,33 +34,41 @@ param(
     [string]$FromAgent = "unknown-agent"
 )
 
-$ErrorActionPreference = "Stop"
 
-if (-not $Query -or $Query.Count -eq 0) {
+# The logic lives in functions so tests can dot-source this file without running
+# it. Running the script (.\grok-oracle.ps1 ...) behaves exactly as before; see the
+# guard at the bottom of the file.
+
+function Write-GrokOracleUsage {
     Write-Host "Usage: .\grok-oracle.ps1 [-FromAgent <name>] <your query here>"
     Write-Host ""
     Write-Host "Examples:"
     Write-Host '  .\grok-oracle.ps1 "What are builders on X saying about Grok 4 coding in the last 10 days?"'
     Write-Host '  .\grok-oracle.ps1 -FromAgent "cursor" "Compare local file MCP vs small HTTP bridge for agent-to-Grok calls. Include recent X signal."'
-    exit 1
 }
 
-$fullQuery = ($Query -join " ").Trim()
-
-if ([string]::IsNullOrWhiteSpace($fullQuery)) {
-    Write-Error "Query cannot be empty."
-    exit 1
+function Join-GrokOracleQuery {
+    param([string[]]$Query)
+    return ($Query -join " ").Trim()
 }
 
-$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+function Format-GrokOracleHandoff {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FullQuery,
 
-$handoff = @"
+        [string]$FromAgent = "unknown-agent",
+
+        [string]$Timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+    )
+
+    return @"
 === GROK ORACLE REQUEST ===
-Generated: $timestamp
+Generated: $Timestamp
 From Agent: $FromAgent
 
 QUERY:
-$fullQuery
+$FullQuery
 
 --------------------------------------------------
 INSTRUCTIONS FOR HUMAN (Grok Build TUI):
@@ -69,7 +77,7 @@ INSTRUCTIONS FOR HUMAN (Grok Build TUI):
 2. In your Grok TUI, type one of:
      /grok-oracle
    or (including the query on the same line):
-     /grok-oracle $fullQuery
+     /grok-oracle $FullQuery
 
 3. Grok (with the grok-oracle skill active) will research using privileged X tools
    + Grok Build patterns and return a structured answer optimized for pasting
@@ -83,17 +91,58 @@ It prioritizes fresh X signal and clear evidence-backed answers.
 --------------------------------------------------
 
 If you want to run this query directly yourself:
-  /grok-oracle $fullQuery
+  /grok-oracle $FullQuery
 "@
+}
 
-Write-Host $handoff
+function Get-GrokOracleRequestPath {
+    param(
+        [string]$Directory = [System.IO.Path]::GetTempPath(),
+        [string]$Stamp = (Get-Date -Format "yyyyMMdd-HHmmss")
+    )
+    return Join-Path $Directory "grok-oracle-request-$Stamp.txt"
+}
 
-# Also write to a temp file for easy copy (optional nicety)
-$tempDir = [System.IO.Path]::GetTempPath()
-$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$tempFile = Join-Path $tempDir "grok-oracle-request-$stamp.txt"
-$handoff | Out-File -FilePath $tempFile -Encoding UTF8
+# Returns the process exit code: 1 for the usage path, 0 on success. An empty
+# (whitespace-only) query raises a terminating error, as the original script did.
+function Invoke-GrokOracleBridge {
+    param(
+        [string[]]$Query,
+        [string]$FromAgent = "unknown-agent",
+        [string]$OutputDirectory = [System.IO.Path]::GetTempPath()
+    )
 
-Write-Host ""
-Write-Host "(Also written to: $tempFile)" -ForegroundColor DarkGray
-Write-Host "You can open that file and copy the QUERY section if it's easier." -ForegroundColor DarkGray
+    $ErrorActionPreference = "Stop"
+
+    if (-not $Query -or $Query.Count -eq 0) {
+        Write-GrokOracleUsage
+        return 1
+    }
+
+    $fullQuery = Join-GrokOracleQuery $Query
+
+    if ([string]::IsNullOrWhiteSpace($fullQuery)) {
+        Write-Error "Query cannot be empty."
+        return 1
+    }
+
+    $handoff = Format-GrokOracleHandoff -FullQuery $fullQuery -FromAgent $FromAgent
+
+    Write-Host $handoff
+
+    # Also write to a temp file for easy copy (optional nicety)
+    $tempFile = Get-GrokOracleRequestPath -Directory $OutputDirectory
+    $handoff | Out-File -FilePath $tempFile -Encoding UTF8
+
+    Write-Host ""
+    Write-Host "(Also written to: $tempFile)" -ForegroundColor DarkGray
+    Write-Host "You can open that file and copy the QUERY section if it's easier." -ForegroundColor DarkGray
+
+    return 0
+}
+
+# Run only when executed, not when dot-sourced (". .\grok-oracle.ps1") by the tests.
+if ($MyInvocation.InvocationName -ne '.') {
+    $exitCode = Invoke-GrokOracleBridge -Query $Query -FromAgent $FromAgent
+    if ($exitCode -ne 0) { exit $exitCode }
+}
